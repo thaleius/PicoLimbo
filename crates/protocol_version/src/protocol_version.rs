@@ -129,6 +129,11 @@ impl ProtocolVersion {
     }
 
     #[inline]
+    pub fn supports_modern_forwarding(&self) -> bool {
+        self.is_after_inclusive(ProtocolVersion::V1_7_6)
+    }
+
+    #[inline]
     pub fn is_any(&self) -> bool {
         *self == Self::Any
     }

@@ -22,7 +22,7 @@ impl PacketHandler for LoginStartPacket {
     ) -> Result<Batch<PacketRegistry>, PacketHandlerError> {
         let mut batch = Batch::new();
         if server_state.is_modern_forwarding() {
-            if client_state.protocol_version().is_modern() {
+            if client_state.protocol_version().supports_modern_forwarding() {
                 login_start_velocity(&mut batch, client_state);
             } else {
                 client_state.kick(CLIENT_MODERN_FORWARDING_NOT_SUPPORTED_KICK_MESSAGE);
@@ -110,7 +110,7 @@ mod tests {
     async fn test_login_start_velocity_happy_path() {
         // Given
         let server_state = velocity();
-        let mut client_state = client(ProtocolVersion::V1_13); // ≥ 1.13
+        let mut client_state = client(ProtocolVersion::V1_13); // ≥ 1.7.6
         let pkt = packet();
 
         // When
@@ -128,10 +128,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_login_start_velocity_accepts_1_7_6() {
+        // Given
+        let server_state = velocity();
+        let mut client_state = client(ProtocolVersion::V1_7_6);
+        let pkt = packet();
+
+        // When
+        let batch = pkt.handle(&mut client_state, &server_state).unwrap();
+        let mut batch = batch.into_stream();
+
+        // Then
+        assert!(
+            matches!(batch.next().await.unwrap(), PacketRegistry::CustomQuery(_)),
+            "first packet should be the velocity CustomQuery for 1.7.6 and up (including 1.7.10)"
+        );
+        assert!(client_state.should_kick().is_none());
+        assert!(batch.next().await.is_none());
+    }
+
+    #[tokio::test]
     async fn test_login_start_velocity_kicks_old_client() {
         // Given
         let server_state = velocity();
-        let mut client_state = client(ProtocolVersion::V1_12_2); // < 1.13
+        let mut client_state = client(ProtocolVersion::V1_7_2); // < 1.7.6
         let pkt = packet();
 
         // When
